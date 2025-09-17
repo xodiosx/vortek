@@ -7268,6 +7268,32 @@ static inline void vt_unserialize_VkPhysicalDeviceProperties(VkPhysicalDevicePro
     bufferOffset += vt_sizeof_VkPhysicalDeviceSparseProperties(&val->sparseProperties);
 }
 
+static inline int vt_sizeof_VkPhysicalDeviceMapMemoryPlacedPropertiesEXT(VkPhysicalDeviceMapMemoryPlacedPropertiesEXT* val) {
+    int bufferSize = 0;
+    bufferSize += 4; // sType
+    bufferSize += 8; // minPlacedMemoryMapAlignment
+    return bufferSize;
+}
+
+static inline void vt_serialize_VkPhysicalDeviceMapMemoryPlacedPropertiesEXT(VkPhysicalDeviceMapMemoryPlacedPropertiesEXT* val, char* outputBuffer) {
+    int bufferOffset = 0;
+    *(VkStructureType*)(outputBuffer + bufferOffset) = val->sType;
+    bufferOffset += 4;
+    *(VkDeviceSize*)(outputBuffer + bufferOffset) = val->minPlacedMemoryMapAlignment;
+    bufferOffset += 8;
+}
+
+static inline void vt_unserialize_VkPhysicalDeviceMapMemoryPlacedPropertiesEXT(VkPhysicalDeviceMapMemoryPlacedPropertiesEXT* val, char* inputBuffer, MemoryPool* memoryPool) {
+    int bufferOffset = 0;
+    val->sType = *(VkStructureType*)(inputBuffer + bufferOffset);
+    bufferOffset += 4;
+#ifdef VT_SERVER
+    val->pNext = NULL;
+#endif
+    val->minPlacedMemoryMapAlignment = *(VkDeviceSize*)(inputBuffer + bufferOffset);
+    bufferOffset += 8;
+}
+
 static inline int vt_sizeof_VkPhysicalDeviceShaderModuleIdentifierPropertiesEXT(VkPhysicalDeviceShaderModuleIdentifierPropertiesEXT* val) {
     int bufferSize = 0;
     bufferSize += 4; // sType
@@ -9195,6 +9221,42 @@ static inline void vt_unserialize_VkPhysicalDevicePushDescriptorPropertiesKHR(Vk
     val->pNext = NULL;
 #endif
     val->maxPushDescriptors = *(uint32_t*)(inputBuffer + bufferOffset);
+    bufferOffset += 4;
+}
+
+static inline int vt_sizeof_VkPhysicalDeviceMapMemoryPlacedFeaturesEXT(VkPhysicalDeviceMapMemoryPlacedFeaturesEXT* val) {
+    int bufferSize = 0;
+    bufferSize += 4; // sType
+    bufferSize += 4; // memoryMapPlaced
+    bufferSize += 4; // memoryMapRangePlaced
+    bufferSize += 4; // memoryUnmapReserve
+    return bufferSize;
+}
+
+static inline void vt_serialize_VkPhysicalDeviceMapMemoryPlacedFeaturesEXT(VkPhysicalDeviceMapMemoryPlacedFeaturesEXT* val, char* outputBuffer) {
+    int bufferOffset = 0;
+    *(VkStructureType*)(outputBuffer + bufferOffset) = val->sType;
+    bufferOffset += 4;
+    *(VkBool32*)(outputBuffer + bufferOffset) = val->memoryMapPlaced;
+    bufferOffset += 4;
+    *(VkBool32*)(outputBuffer + bufferOffset) = val->memoryMapRangePlaced;
+    bufferOffset += 4;
+    *(VkBool32*)(outputBuffer + bufferOffset) = val->memoryUnmapReserve;
+    bufferOffset += 4;
+}
+
+static inline void vt_unserialize_VkPhysicalDeviceMapMemoryPlacedFeaturesEXT(VkPhysicalDeviceMapMemoryPlacedFeaturesEXT* val, char* inputBuffer, MemoryPool* memoryPool) {
+    int bufferOffset = 0;
+    val->sType = *(VkStructureType*)(inputBuffer + bufferOffset);
+    bufferOffset += 4;
+#ifdef VT_SERVER
+    val->pNext = NULL;
+#endif
+    val->memoryMapPlaced = *(VkBool32*)(inputBuffer + bufferOffset);
+    bufferOffset += 4;
+    val->memoryMapRangePlaced = *(VkBool32*)(inputBuffer + bufferOffset);
+    bufferOffset += 4;
+    val->memoryUnmapReserve = *(VkBool32*)(inputBuffer + bufferOffset);
     bufferOffset += 4;
 }
 
@@ -13060,6 +13122,11 @@ static inline int vt_sizeof_VkPhysicalDeviceFeatures2(VkPhysicalDeviceFeatures2*
                 bufferSize += vt_sizeof_VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT((VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT*)pNext);
                 break;
             }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_FEATURES_EXT: {
+                bufferSize += 4;
+                bufferSize += vt_sizeof_VkPhysicalDeviceMapMemoryPlacedFeaturesEXT((VkPhysicalDeviceMapMemoryPlacedFeaturesEXT*)pNext);
+                break;
+            }
             default: {
                 bufferSize += 4;
                 break;
@@ -13501,6 +13568,14 @@ static inline void vt_serialize_VkPhysicalDeviceFeatures2(VkPhysicalDeviceFeatur
                     *(int*)(outputBuffer + bufferOffset) = itemSize;
                     bufferOffset += 4;
                     vt_serialize_VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT((VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT*)pNext, outputBuffer + bufferOffset);
+                    bufferOffset += itemSize;
+                    break;
+                }
+                case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_FEATURES_EXT: {
+                    int itemSize = vt_sizeof_VkPhysicalDeviceMapMemoryPlacedFeaturesEXT((VkPhysicalDeviceMapMemoryPlacedFeaturesEXT*)pNext);
+                    *(int*)(outputBuffer + bufferOffset) = itemSize;
+                    bufferOffset += 4;
+                    vt_serialize_VkPhysicalDeviceMapMemoryPlacedFeaturesEXT((VkPhysicalDeviceMapMemoryPlacedFeaturesEXT*)pNext, outputBuffer + bufferOffset);
                     bufferOffset += itemSize;
                     break;
                 }
@@ -14370,6 +14445,22 @@ static inline void vt_unserialize_VkPhysicalDeviceFeatures2(VkPhysicalDeviceFeat
                 }
                 break;
             }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_FEATURES_EXT: {
+                int itemSize = *(int*)(inputBuffer + bufferOffset);
+                bufferOffset += 4;
+                if (itemSize > 0) {
+                    VkPhysicalDeviceMapMemoryPlacedFeaturesEXT* item = !pNextIsNULL ? findNextVkStructure(val->pNext, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_FEATURES_EXT) : NULL;
+                    if (!item) item = vt_alloc(memoryPool, sizeof(VkPhysicalDeviceMapMemoryPlacedFeaturesEXT));
+                    vt_unserialize_VkPhysicalDeviceMapMemoryPlacedFeaturesEXT(item, inputBuffer + bufferOffset, memoryPool);
+                    bufferOffset += itemSize;
+
+                    if (pNextIsNULL) {
+                        item->pNext = pNext;
+                        pNext = item;
+                    }
+                }
+                break;
+            }
             default: {
                 bufferOffset += 4;
                 break;
@@ -14548,6 +14639,11 @@ static inline int vt_sizeof_VkPhysicalDeviceProperties2(VkPhysicalDeviceProperti
             case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_MODULE_IDENTIFIER_PROPERTIES_EXT: {
                 bufferSize += 4;
                 bufferSize += vt_sizeof_VkPhysicalDeviceShaderModuleIdentifierPropertiesEXT((VkPhysicalDeviceShaderModuleIdentifierPropertiesEXT*)pNext);
+                break;
+            }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_PROPERTIES_EXT: {
+                bufferSize += 4;
+                bufferSize += vt_sizeof_VkPhysicalDeviceMapMemoryPlacedPropertiesEXT((VkPhysicalDeviceMapMemoryPlacedPropertiesEXT*)pNext);
                 break;
             }
             default: {
@@ -14823,6 +14919,14 @@ static inline void vt_serialize_VkPhysicalDeviceProperties2(VkPhysicalDeviceProp
                     *(int*)(outputBuffer + bufferOffset) = itemSize;
                     bufferOffset += 4;
                     vt_serialize_VkPhysicalDeviceShaderModuleIdentifierPropertiesEXT((VkPhysicalDeviceShaderModuleIdentifierPropertiesEXT*)pNext, outputBuffer + bufferOffset);
+                    bufferOffset += itemSize;
+                    break;
+                }
+                case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_PROPERTIES_EXT: {
+                    int itemSize = vt_sizeof_VkPhysicalDeviceMapMemoryPlacedPropertiesEXT((VkPhysicalDeviceMapMemoryPlacedPropertiesEXT*)pNext);
+                    *(int*)(outputBuffer + bufferOffset) = itemSize;
+                    bufferOffset += 4;
+                    vt_serialize_VkPhysicalDeviceMapMemoryPlacedPropertiesEXT((VkPhysicalDeviceMapMemoryPlacedPropertiesEXT*)pNext, outputBuffer + bufferOffset);
                     bufferOffset += itemSize;
                     break;
                 }
@@ -15347,6 +15451,22 @@ static inline void vt_unserialize_VkPhysicalDeviceProperties2(VkPhysicalDevicePr
                     VkPhysicalDeviceShaderModuleIdentifierPropertiesEXT* item = !pNextIsNULL ? findNextVkStructure(val->pNext, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_MODULE_IDENTIFIER_PROPERTIES_EXT) : NULL;
                     if (!item) item = vt_alloc(memoryPool, sizeof(VkPhysicalDeviceShaderModuleIdentifierPropertiesEXT));
                     vt_unserialize_VkPhysicalDeviceShaderModuleIdentifierPropertiesEXT(item, inputBuffer + bufferOffset, memoryPool);
+                    bufferOffset += itemSize;
+
+                    if (pNextIsNULL) {
+                        item->pNext = pNext;
+                        pNext = item;
+                    }
+                }
+                break;
+            }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_PROPERTIES_EXT: {
+                int itemSize = *(int*)(inputBuffer + bufferOffset);
+                bufferOffset += 4;
+                if (itemSize > 0) {
+                    VkPhysicalDeviceMapMemoryPlacedPropertiesEXT* item = !pNextIsNULL ? findNextVkStructure(val->pNext, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_PROPERTIES_EXT) : NULL;
+                    if (!item) item = vt_alloc(memoryPool, sizeof(VkPhysicalDeviceMapMemoryPlacedPropertiesEXT));
+                    vt_unserialize_VkPhysicalDeviceMapMemoryPlacedPropertiesEXT(item, inputBuffer + bufferOffset, memoryPool);
                     bufferOffset += itemSize;
 
                     if (pNextIsNULL) {
@@ -18413,6 +18533,51 @@ static inline void vt_unserialize_VkSemaphoreSignalInfo(VkSemaphoreSignalInfo* v
     bufferOffset += 8;
 }
 
+static inline int vt_sizeof_VkMemoryUnmapInfoKHR(VkMemoryUnmapInfoKHR* val) {
+    int bufferSize = 0;
+    bufferSize += 4; // sType
+    bufferSize += 4; // flags
+    bufferSize += vt_sizeof_VkDeviceMemory(val->memory);
+    return bufferSize;
+}
+
+static inline void vt_serialize_VkMemoryUnmapInfoKHR(VkMemoryUnmapInfoKHR* val, char* outputBuffer) {
+    int bufferOffset = 0;
+    *(VkStructureType*)(outputBuffer + bufferOffset) = val->sType;
+    bufferOffset += 4;
+    *(VkMemoryUnmapFlagsKHR*)(outputBuffer + bufferOffset) = val->flags;
+    bufferOffset += 4;
+
+#ifdef VT_SERVER
+    vt_serialize_VkDeviceMemory(val->memory, outputBuffer + bufferOffset);
+#else
+    VkObject* memoryObject = VkObject_fromHandle(val->memory);
+    vt_serialize_VkDeviceMemory((VkDeviceMemory)&memoryObject->id, outputBuffer + bufferOffset);
+#endif
+    bufferOffset += vt_sizeof_VkDeviceMemory(val->memory);
+}
+
+static inline void vt_unserialize_VkMemoryUnmapInfoKHR(VkMemoryUnmapInfoKHR* val, char* inputBuffer, MemoryPool* memoryPool) {
+    int bufferOffset = 0;
+    val->sType = *(VkStructureType*)(inputBuffer + bufferOffset);
+    bufferOffset += 4;
+#ifdef VT_SERVER
+    val->pNext = NULL;
+#endif
+    val->flags = *(VkMemoryUnmapFlagsKHR*)(inputBuffer + bufferOffset);
+    bufferOffset += 4;
+
+    uint64_t memoryId;
+    vt_unserialize_VkDeviceMemory((VkDeviceMemory)&memoryId, inputBuffer + bufferOffset, memoryPool);
+#ifdef VT_SERVER
+    val->memory = vortekSerializerCastVkObject ? ((ResourceMemory*)VkObject_fromId(memoryId))->memory : VkObject_fromId(memoryId);
+#else
+    VkObject* memoryObject = VkObject_create(VK_OBJECT_TYPE_DEVICE_MEMORY, memoryId);
+    val->memory = VkObject_toHandle(memoryObject);
+#endif
+    bufferOffset += vt_sizeof_VkDeviceMemory(val->memory);
+}
+
 static inline int vt_sizeof_VkSamplerCustomBorderColorCreateInfoEXT(VkSamplerCustomBorderColorCreateInfoEXT* val) {
     int bufferSize = 0;
     bufferSize += 4; // sType
@@ -20643,6 +20808,11 @@ static inline int vt_sizeof_VkDeviceCreateInfo(VkDeviceCreateInfo* val) {
                 bufferSize += vt_sizeof_VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT((VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT*)pNext);
                 break;
             }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_FEATURES_EXT: {
+                bufferSize += 4;
+                bufferSize += vt_sizeof_VkPhysicalDeviceMapMemoryPlacedFeaturesEXT((VkPhysicalDeviceMapMemoryPlacedFeaturesEXT*)pNext);
+                break;
+            }
             default: {
                 bufferSize += 4;
                 break;
@@ -21137,6 +21307,14 @@ static inline void vt_serialize_VkDeviceCreateInfo(VkDeviceCreateInfo* val, char
                     *(int*)(outputBuffer + bufferOffset) = itemSize;
                     bufferOffset += 4;
                     vt_serialize_VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT((VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT*)pNext, outputBuffer + bufferOffset);
+                    bufferOffset += itemSize;
+                    break;
+                }
+                case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_FEATURES_EXT: {
+                    int itemSize = vt_sizeof_VkPhysicalDeviceMapMemoryPlacedFeaturesEXT((VkPhysicalDeviceMapMemoryPlacedFeaturesEXT*)pNext);
+                    *(int*)(outputBuffer + bufferOffset) = itemSize;
+                    bufferOffset += 4;
+                    vt_serialize_VkPhysicalDeviceMapMemoryPlacedFeaturesEXT((VkPhysicalDeviceMapMemoryPlacedFeaturesEXT*)pNext, outputBuffer + bufferOffset);
                     bufferOffset += itemSize;
                     break;
                 }
@@ -22114,6 +22292,22 @@ static inline void vt_unserialize_VkDeviceCreateInfo(VkDeviceCreateInfo* val, ch
                     VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT* item = !pNextIsNULL ? findNextVkStructure(val->pNext, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_MODULE_IDENTIFIER_FEATURES_EXT) : NULL;
                     if (!item) item = vt_alloc(memoryPool, sizeof(VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT));
                     vt_unserialize_VkPhysicalDeviceShaderModuleIdentifierFeaturesEXT(item, inputBuffer + bufferOffset, memoryPool);
+                    bufferOffset += itemSize;
+
+                    if (pNextIsNULL) {
+                        item->pNext = pNext;
+                        pNext = item;
+                    }
+                }
+                break;
+            }
+            case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_FEATURES_EXT: {
+                int itemSize = *(int*)(inputBuffer + bufferOffset);
+                bufferOffset += 4;
+                if (itemSize > 0) {
+                    VkPhysicalDeviceMapMemoryPlacedFeaturesEXT* item = !pNextIsNULL ? findNextVkStructure(val->pNext, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_FEATURES_EXT) : NULL;
+                    if (!item) item = vt_alloc(memoryPool, sizeof(VkPhysicalDeviceMapMemoryPlacedFeaturesEXT));
+                    vt_unserialize_VkPhysicalDeviceMapMemoryPlacedFeaturesEXT(item, inputBuffer + bufferOffset, memoryPool);
                     bufferOffset += itemSize;
 
                     if (pNextIsNULL) {

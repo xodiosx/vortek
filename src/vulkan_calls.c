@@ -330,15 +330,9 @@ void vt_call_vkFreeMemory(VkDevice device, VkDeviceMemory memory, const VkAlloca
 VkResult vt_call_vkMapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size, VkMemoryMapFlags flags, void** ppData) {
     VT_CALL_LOCK();    
     VkObject* memoryObject = VkObject_fromHandle(memory);
-    static int usePlacedAddr = -1;
-    
-    if (usePlacedAddr == -1) {
-        usePlacedAddr = getenv("WINEVKUSEPLACEDADDR") && atoi(getenv("WINEVKUSEPLACEDADDR"));
-    }
-    
+
     MappedMemory* mappedMemory = memoryObject->tag;
-    void* placedAddr = usePlacedAddr && *ppData ? *ppData : NULL;
-    if (mappedMemory->data && (!placedAddr || placedAddr == mappedMemory->data)) {
+    if (mappedMemory->data) {
         VT_CALL_UNLOCK();
         return VK_SUCCESS;
     }
@@ -352,12 +346,11 @@ VkResult vt_call_vkMapMemory(VkDevice device, VkDeviceMemory memory, VkDeviceSiz
         if (size == VK_WHOLE_SIZE) size = mappedMemory->allocationSize;
         mappedMemory->size = size;
         
-        void* data = mmap(placedAddr, size, PROT_WRITE | PROT_READ, MAP_SHARED | (placedAddr ? MAP_FIXED : 0), fd, offset);
+        void* data = mmap(NULL, size, PROT_WRITE | PROT_READ, MAP_SHARED, fd, offset);
         if (data != MAP_FAILED) {
             CLOSEFD(fd);
             mappedMemory->data = data;
-            
-            if (!placedAddr) *ppData = data;
+            *ppData = data;
         }
         else result = VK_ERROR_MEMORY_MAP_FAILED;
     }
@@ -3106,6 +3099,48 @@ void vt_call_vkGetShaderModuleCreateInfoIdentifierEXT(VkDevice device, const VkS
     VT_CALL_UNLOCK();
 }
 
+VkResult vt_call_vkMapMemory2KHR(VkDevice device, const VkMemoryMapInfoKHR* pMemoryMapInfo, void** ppData) {
+    VT_CALL_LOCK();
+    VkObject* memoryObject = VkObject_fromHandle(pMemoryMapInfo->memory);
+
+    MappedMemory* mappedMemory = memoryObject->tag;
+    if (mappedMemory->data) {
+        VT_CALL_UNLOCK();
+        return VK_SUCCESS;
+    }
+
+    VT_SERIALIZE_CMD(VkDeviceMemory, (VkDeviceMemory)&memoryObject->id);
+    VT_SEND_CHECKED(REQUEST_CODE_VK_MAP_MEMORY, VT_RETURN);
+
+    int fd, result, numFds;
+    recv_fds(serverFd, &fd, &numFds, &result, sizeof(VkResult));
+    if (numFds == 1) {
+        mappedMemory->size = pMemoryMapInfo->size;
+        if (mappedMemory->size == VK_WHOLE_SIZE) mappedMemory->size = mappedMemory->allocationSize;
+
+        VkMemoryMapPlacedInfoEXT* placedInfo = findNextVkStructure(pMemoryMapInfo->pNext, VK_STRUCTURE_TYPE_MEMORY_MAP_PLACED_INFO_EXT);
+        void* placedAddr = placedInfo ? placedInfo->pPlacedAddress : NULL;
+
+        void* data = mmap(placedAddr, mappedMemory->size, PROT_WRITE | PROT_READ, MAP_SHARED | (placedAddr ? MAP_FIXED : 0), fd, pMemoryMapInfo->offset);
+        if (data != MAP_FAILED) {
+            CLOSEFD(fd);
+            mappedMemory->data = data;
+
+            if (!placedAddr) *ppData = data;
+        }
+        else result = VK_ERROR_MEMORY_MAP_FAILED;
+    }
+    else result = VK_ERROR_MEMORY_MAP_FAILED;
+
+    VT_CALL_UNLOCK();
+    return (VkResult)result;
+}
+
+VkResult vt_call_vkUnmapMemory2KHR(VkDevice device, const VkMemoryUnmapInfoKHR* pMemoryUnmapInfo) {
+    vt_call_vkUnmapMemory(device, pMemoryUnmapInfo->memory);
+    return VK_SUCCESS;
+}
+
 static const struct VulkanFunc vkDispatchTable[] = {
     {"vkCreateInstance", vt_call_vkCreateInstance},
     {"vkDestroyInstance", vt_call_vkDestroyInstance},
@@ -3433,6 +3468,8 @@ static const struct VulkanFunc vkDispatchTable[] = {
     {"vkCmdEndRenderingKHR", vt_call_vkCmdEndRendering},
     {"vkGetShaderModuleIdentifierEXT", vt_call_vkGetShaderModuleIdentifierEXT},
     {"vkGetShaderModuleCreateInfoIdentifierEXT", vt_call_vkGetShaderModuleCreateInfoIdentifierEXT},
+    {"vkMapMemory2KHR", vt_call_vkMapMemory2KHR},
+    {"vkUnmapMemory2KHR", vt_call_vkUnmapMemory2KHR},
 };
 
 static void* findVkDispatchFuncWithName(const char* name) {

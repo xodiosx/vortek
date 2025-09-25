@@ -18533,51 +18533,6 @@ static inline void vt_unserialize_VkSemaphoreSignalInfo(VkSemaphoreSignalInfo* v
     bufferOffset += 8;
 }
 
-static inline int vt_sizeof_VkMemoryUnmapInfoKHR(VkMemoryUnmapInfoKHR* val) {
-    int bufferSize = 0;
-    bufferSize += 4; // sType
-    bufferSize += 4; // flags
-    bufferSize += vt_sizeof_VkDeviceMemory(val->memory);
-    return bufferSize;
-}
-
-static inline void vt_serialize_VkMemoryUnmapInfoKHR(VkMemoryUnmapInfoKHR* val, char* outputBuffer) {
-    int bufferOffset = 0;
-    *(VkStructureType*)(outputBuffer + bufferOffset) = val->sType;
-    bufferOffset += 4;
-    *(VkMemoryUnmapFlagsKHR*)(outputBuffer + bufferOffset) = val->flags;
-    bufferOffset += 4;
-
-#ifdef VT_SERVER
-    vt_serialize_VkDeviceMemory(val->memory, outputBuffer + bufferOffset);
-#else
-    VkObject* memoryObject = VkObject_fromHandle(val->memory);
-    vt_serialize_VkDeviceMemory((VkDeviceMemory)&memoryObject->id, outputBuffer + bufferOffset);
-#endif
-    bufferOffset += vt_sizeof_VkDeviceMemory(val->memory);
-}
-
-static inline void vt_unserialize_VkMemoryUnmapInfoKHR(VkMemoryUnmapInfoKHR* val, char* inputBuffer, MemoryPool* memoryPool) {
-    int bufferOffset = 0;
-    val->sType = *(VkStructureType*)(inputBuffer + bufferOffset);
-    bufferOffset += 4;
-#ifdef VT_SERVER
-    val->pNext = NULL;
-#endif
-    val->flags = *(VkMemoryUnmapFlagsKHR*)(inputBuffer + bufferOffset);
-    bufferOffset += 4;
-
-    uint64_t memoryId;
-    vt_unserialize_VkDeviceMemory((VkDeviceMemory)&memoryId, inputBuffer + bufferOffset, memoryPool);
-#ifdef VT_SERVER
-    val->memory = vortekSerializerCastVkObject ? ((ResourceMemory*)VkObject_fromId(memoryId))->memory : VkObject_fromId(memoryId);
-#else
-    VkObject* memoryObject = VkObject_create(VK_OBJECT_TYPE_DEVICE_MEMORY, memoryId);
-    val->memory = VkObject_toHandle(memoryObject);
-#endif
-    bufferOffset += vt_sizeof_VkDeviceMemory(val->memory);
-}
-
 static inline int vt_sizeof_VkSamplerCustomBorderColorCreateInfoEXT(VkSamplerCustomBorderColorCreateInfoEXT* val) {
     int bufferSize = 0;
     bufferSize += 4; // sType

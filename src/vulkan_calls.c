@@ -24,6 +24,31 @@ static pthread_mutex_t vt_call_mutex = PTHREAD_MUTEX_INITIALIZER;
     vt_free(&globalMemoryPool); \
     pthread_mutex_unlock(&vt_call_mutex);
 
+static VkResult waitForPipelineCreation(int pipelineCount, VkPipeline* pPipelines) {
+    int numFds, fd;
+    char success = 0;
+    recv_fds(serverFd, &fd, &numFds, &success, 1);
+    VT_CALL_UNLOCK();
+
+    if (!success || numFds != 1) return VK_ERROR_DEVICE_LOST;
+
+    int bufferSize = sizeof(VkResult) + pipelineCount * VK_HANDLE_BYTE_COUNT;
+    char inputBuffer[bufferSize];
+
+    int bytesRead = read(fd, inputBuffer, bufferSize);
+    CLOSEFD(fd);
+    if (bytesRead != bufferSize) return VK_ERROR_DEVICE_LOST;
+
+    int result = *(int*)(inputBuffer + 0);
+    for (int i = 0, j = sizeof(VkResult); i < pipelineCount; i++, j += VK_HANDLE_BYTE_COUNT) {
+        uint64_t pipelineId = *(uint64_t*)(inputBuffer + j);
+        VkObject* pipelineObject = VkObject_create(VK_OBJECT_TYPE_PIPELINE, pipelineId);
+        pPipelines[i] = VkObject_toHandle(pipelineObject);
+    }
+
+    return (VkResult)result;
+}
+
 VkResult vt_call_vkCreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkInstance* pInstance) {
     VT_CALL_LOCK();
 
@@ -959,17 +984,8 @@ VkResult vt_call_vkCreateGraphicsPipelines(VkDevice device, VkPipelineCache pipe
 
     VT_SERIALIZE_CMD(vkCreateGraphicsPipelines, (VkDevice)&deviceObject->id, (VkPipelineCache)&pipelineCacheObject->id, createInfoCount, pCreateInfos, NULL, NULL);
     VT_SEND_CHECKED(REQUEST_CODE_VK_CREATE_GRAPHICS_PIPELINES, VT_RETURN);
-    VT_RECV_CHECKED(VT_RETURN);
 
-    for (int i = 0, j = 0; i < createInfoCount; i++, j += VK_HANDLE_BYTE_COUNT) {
-        uint64_t pipelineId;
-        vt_unserialize_VkPipeline((VkPipeline)&pipelineId, inputBuffer + j, &globalMemoryPool);
-        VkObject* pipelineObject = VkObject_create(VK_OBJECT_TYPE_PIPELINE, pipelineId);
-        pPipelines[i] = VkObject_toHandle(pipelineObject);
-    }
-
-    VT_CALL_UNLOCK();
-    return (VkResult)result;
+    return waitForPipelineCreation(createInfoCount, pPipelines);
 }
 
 VkResult vt_call_vkCreateComputePipelines(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkComputePipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines) {
@@ -979,17 +995,8 @@ VkResult vt_call_vkCreateComputePipelines(VkDevice device, VkPipelineCache pipel
 
     VT_SERIALIZE_CMD(vkCreateComputePipelines, (VkDevice)&deviceObject->id, (VkPipelineCache)&pipelineCacheObject->id, createInfoCount, pCreateInfos, NULL, NULL);
     VT_SEND_CHECKED(REQUEST_CODE_VK_CREATE_COMPUTE_PIPELINES, VT_RETURN);
-    VT_RECV_CHECKED(VT_RETURN);
 
-    for (int i = 0, j = 0; i < createInfoCount; i++, j += VK_HANDLE_BYTE_COUNT) {
-        uint64_t pipelineId;
-        vt_unserialize_VkPipeline((VkPipeline)&pipelineId, inputBuffer + j, &globalMemoryPool);
-        VkObject* pipelineObject = VkObject_create(VK_OBJECT_TYPE_PIPELINE, pipelineId);
-        pPipelines[i] = VkObject_toHandle(pipelineObject);
-    }
-
-    VT_CALL_UNLOCK();
-    return (VkResult)result;
+    return waitForPipelineCreation(createInfoCount, pPipelines);
 }
 
 void vt_call_vkDestroyPipeline(VkDevice device, VkPipeline pipeline, const VkAllocationCallbacks* pAllocator) {

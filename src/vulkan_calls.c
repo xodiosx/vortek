@@ -2913,7 +2913,7 @@ void vt_call_vkDestroyPrivateDataSlot(VkDevice device, VkPrivateDataSlot private
     VkObject* privateDataSlotObject = VkObject_fromHandle(privateDataSlot);
     ArrayList* dataList = privateDataSlotObject->tag;
     
-    ArrayList_free(dataList);
+    ArrayList_free(dataList, true);
     VkObject_free(privateDataSlotObject);
     VT_CALL_UNLOCK();
 }

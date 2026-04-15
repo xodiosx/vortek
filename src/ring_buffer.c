@@ -12,12 +12,12 @@
 #include "time_utils.h"
 #include "events.h"
 
-#define STRUCT_OFFSETS(x) \
+#define STRUCT_OFFSETS() \
     struct Offsets { \
-        __attribute__((aligned(x))) uint32_t head; \
-        __attribute__((aligned(x))) uint32_t tail; \
-        __attribute__((aligned(x))) uint32_t status; \
-        __attribute__((aligned(x))) void* buffer; \
+        uint32_t head; \
+        uint32_t tail; \
+        uint32_t status; \
+        void* buffer; \
     }
 
 #ifdef __ANDROID__
@@ -27,28 +27,19 @@
 #define debug_printf(...) fprintf(stderr, __VA_ARGS__)
 #endif
 
-#define COND_WAIT(cond) \
-    uint32_t busyWaitIter = 0; \
-    do { \
-        if (cond) break; \
-        busyWait(&busyWaitIter); \
-        if (RingBuffer_hasStatus(ring, RING_STATUS_EXIT)) return false; \
-    } \
-    while (1)
-
-static void RingBuffer_setHead(RingBuffer* ring, uint32_t head) {
+void RingBuffer_setHead(RingBuffer* ring, uint32_t head) {
     atomic_store_explicit(ring->head, head, memory_order_release);
 }
 
-static uint32_t RingBuffer_getHead(RingBuffer* ring) {
+uint32_t RingBuffer_getHead(RingBuffer* ring) {
     return atomic_load_explicit(ring->head, memory_order_acquire);
 }
 
-static void RingBuffer_setTail(RingBuffer* ring, uint32_t tail) {
+void RingBuffer_setTail(RingBuffer* ring, uint32_t tail) {
     return atomic_store_explicit(ring->tail, tail, memory_order_release);
 }
 
-static uint32_t RingBuffer_getTail(RingBuffer* ring) {
+uint32_t RingBuffer_getTail(RingBuffer* ring) {
     return atomic_load_explicit(ring->tail, memory_order_acquire);
 }
 
@@ -67,7 +58,7 @@ bool RingBuffer_hasStatus(RingBuffer* ring, uint32_t status) {
 RingBuffer* RingBuffer_create(int shmFd, uint32_t bufferSize) {
     RingBuffer* ring = calloc(1, sizeof(RingBuffer));
 
-    STRUCT_OFFSETS(64);
+    STRUCT_OFFSETS();
 
     int shmSize = RingBuffer_getSHMemSize(bufferSize);
     void* sharedData = mmap(NULL, shmSize, PROT_READ | PROT_WRITE, MAP_SHARED, shmFd, 0);
@@ -85,7 +76,7 @@ RingBuffer* RingBuffer_create(int shmFd, uint32_t bufferSize) {
 }
 
 uint32_t RingBuffer_size(RingBuffer* ring) {
-    return (RingBuffer_getTail(ring) - RingBuffer_getHead(ring)) & (ring->bufferSize - 1);
+    return RingBuffer_getTail(ring) - RingBuffer_getHead(ring);
 }
 
 uint32_t RingBuffer_freeSpace(RingBuffer* ring) {
@@ -98,19 +89,20 @@ bool RingBuffer_read(RingBuffer* ring, void* data, uint32_t size) {
         return false;
     }
 
-    COND_WAIT(RingBuffer_size(ring) >= size);
+    if (!RingBuffer_waitForRead(ring, size)) return false;
     uint32_t head = RingBuffer_getHead(ring);
+    uint32_t offset = head & (ring->bufferSize - 1);
 
-    if ((head + size) <= ring->bufferSize) {
-        memcpy(data, ring->buffer + head, size);
+    if ((offset + size) <= ring->bufferSize) {
+        memcpy(data, ring->buffer + offset, size);
     }
     else {
-        uint32_t start = ring->bufferSize - head;
-        memcpy(data, ring->buffer + head, start);
+        uint32_t start = ring->bufferSize - offset;
+        memcpy(data, ring->buffer + offset, start);
         memcpy(data + start, ring->buffer, size - start);
     }
 
-    RingBuffer_setHead(ring, (head + size) & (ring->bufferSize - 1));
+    RingBuffer_setHead(ring, head + size);
     return true;
 }
 
@@ -120,24 +112,25 @@ bool RingBuffer_write(RingBuffer* ring, const void* data, uint32_t size) {
         return false;
     }
 
-    COND_WAIT(RingBuffer_freeSpace(ring) >= size);
+    if (!RingBuffer_waitForWrite(ring, size)) return false;
     uint32_t tail = RingBuffer_getTail(ring);
+    uint32_t offset = tail & (ring->bufferSize - 1);
 
-    if ((tail + size) <= ring->bufferSize) {
-        memcpy(ring->buffer + tail, data, size);
+    if ((offset + size) <= ring->bufferSize) {
+        memcpy(ring->buffer + offset, data, size);
     }
     else {
-        uint32_t start = ring->bufferSize - tail;
-        memcpy(ring->buffer + tail, data, start);
+        uint32_t start = ring->bufferSize - offset;
+        memcpy(ring->buffer + offset, data, start);
         memcpy(ring->buffer, data + start, size - start);
     }
 
-    RingBuffer_setTail(ring, (tail + size) & (ring->bufferSize - 1));
+    RingBuffer_setTail(ring, tail + size);
     return true;
 }
 
 uint32_t RingBuffer_getSHMemSize(uint32_t bufferSize) {
-    STRUCT_OFFSETS(64);
+    STRUCT_OFFSETS();
 
     return bufferSize + offsetof(struct Offsets, buffer);
 }
@@ -152,4 +145,26 @@ void RingBuffer_free(RingBuffer* ring) {
     }
 
     free(ring);
+}
+
+bool RingBuffer_waitForRead(RingBuffer* ring, uint32_t size) {
+    uint32_t busyWaitIter = 0;
+    do {
+        if (RingBuffer_size(ring) >= size) break;
+        busyWait(&busyWaitIter);
+        if (RingBuffer_hasStatus(ring, RING_STATUS_EXIT)) return false;
+    }
+    while (1);
+    return true;
+}
+
+bool RingBuffer_waitForWrite(RingBuffer* ring, uint32_t size) {
+    uint32_t busyWaitIter = 0;
+    do {
+        if (RingBuffer_freeSpace(ring) >= size) break;
+        busyWait(&busyWaitIter);
+        if (RingBuffer_hasStatus(ring, RING_STATUS_EXIT)) return false;
+    }
+    while (1);
+    return true;
 }

@@ -1,0 +1,98 @@
+name: Build Vortek ARM64 (Linux glibc)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout Vortek repository
+      uses: actions/checkout@v4
+      with:
+        repository: brunodev85/vortek
+        ref: main
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Install Cross‑compilation Tools & Dependencies
+      run: |
+        # Free disk space
+        echo "🧹 Freeing disk space..."
+        sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost
+
+        # Add arm64 architecture for multi‑arch packages
+        sudo dpkg --add-architecture arm64
+
+        # Clean up existing sources and set up amd64 + arm64 repos
+        sudo rm -f /etc/apt/sources.list
+        sudo rm -f /etc/apt/sources.list.d/*.sources
+
+        sudo bash -c 'cat << EOF > /etc/apt/sources.list.d/amd64.list
+        deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse
+        deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse
+        deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble-backports main restricted universe multiverse
+        deb [arch=amd64] http://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse
+        EOF'
+
+        sudo bash -c 'cat << EOF > /etc/apt/sources.list.d/arm64.list
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ noble main restricted universe multiverse
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ noble-updates main restricted universe multiverse
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ noble-backports main restricted universe multiverse
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ noble-security main restricted universe multiverse
+        EOF'
+
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+          libvulkan-dev libvulkan-dev:arm64 \
+          libx11-dev libx11-dev:arm64
+
+    - name: Upgrade Vulkan Headers to Latest (including vk_video)
+      run: |
+        echo "🔄 Downloading latest Vulkan headers from Khronos..."
+        git clone https://github.com/KhronosGroup/Vulkan-Headers.git
+        
+        # Update system include paths
+        sudo cp -r Vulkan-Headers/include/vulkan /usr/include/
+        sudo cp -r Vulkan-Headers/include/vk_video /usr/include/
+
+        # Update cross‑compiler specific include paths
+        sudo mkdir -p /usr/aarch64-linux-gnu/include/vulkan
+        sudo mkdir -p /usr/aarch64-linux-gnu/include/vk_video
+        
+        sudo cp -r Vulkan-Headers/include/vulkan/* /usr/aarch64-linux-gnu/include/vulkan/
+        sudo cp -r Vulkan-Headers/include/vk_video/* /usr/aarch64-linux-gnu/include/vk_video/
+        
+        echo "✅ All Vulkan and Video Codec headers updated."
+
+    - name: Configure Vortek for ARM64 Linux (PRoot compatible)
+      run: |
+        cmake -B build -G Ninja \
+          -DCMAKE_SYSTEM_NAME=Linux \
+          -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+          -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=./target \
+          -DCMAKE_STRIP="" \
+          -DCMAKE_C_FLAGS="-fvisibility=default -O2 -Wall -Wno-discarded-qualifiers -DVK_USE_PLATFORM_XLIB_KHR" \
+          -DCMAKE_CXX_FLAGS="-fvisibility=default -O2 -Wall -DVK_USE_PLATFORM_XLIB_KHR" \
+          -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--export-dynamic -Wl,--no-as-needed -Wl,--allow-shlib-undefined"
+          # NOTE: No -rpath or -dynamic-linker is set.
+          # The binary will use the default system linker (/lib/ld-linux-aarch64.so.1),
+          # which works perfectly in normal Linux and PRoot environments.
+
+    - name: Build
+      run: cmake --build build --parallel $(nproc)
+
+    - name: Install (copy artifacts)
+      run: |
+        mkdir -p target/lib
+        cp -f build/*.so target/lib/ 2>/dev/null || cp -f build/libvulkan_vortek.so target/lib/
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: vortek-linux-arm64
+        path: target/*
